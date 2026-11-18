@@ -22,6 +22,10 @@
 
 // An object code of no actor
 #define OBJCODE_NONE 0xffff
+// A script ID of no script
+#define SCRID_NONE 0xffff
+// The zone and ID of RELOADABLE_STRENGTH_ROCKS's last entry, which is not a boulder: the search stops there
+#define STRENGTH_ROCK_TABLE_END 0xffff
 // The work value of OBJ_CODE_WORK_00, the first of the object codes that stand for the object code in a work value
 #define WORK_OBJCODE_FIRST 0x4020
 
@@ -174,7 +178,7 @@ static StrengthRockSlot RELOADABLE_STRENGTH_ROCKS[] = {
     { 0x1f8, 8, 62 },
     { 0x1f8, 9, 63 },
     { 0x1f9, 4, 64 },
-    { 0xffff, 0xffff, STRENGTH_ROCK_SLOT_NONE },
+    { STRENGTH_ROCK_TABLE_END, STRENGTH_ROCK_TABLE_END, STRENGTH_ROCK_SLOT_NONE },
 };
 
 // clang-format on
@@ -782,7 +786,7 @@ u16 FldAct_GetSCRID(FieldActor *actor) {
 }
 
 static BOOL GetActorSCRIDIsMinusOne(FieldActor *actor) {
-    if (FldAct_GetSCRID(actor) == 0xffff) {
+    if (FldAct_GetSCRID(actor) == SCRID_NONE) {
         return TRUE;
     }
     return FALSE;
@@ -1900,7 +1904,7 @@ static const FieldActorSceneNodeVTable *FldAct_GetMainVTableAddr(u8 sceneNodeTyp
 }
 
 static BOOL IsNPCSCRID0xFFFF(const ZoneNPC *npc) {
-    if (npc->scrId == 0xffff) {
+    if (npc->scrId == SCRID_NONE) {
         return TRUE;
     }
     return FALSE;
@@ -1965,7 +1969,7 @@ static u16 GetStrengthRockSaveDataPositionSlotID(u16 zoneId, u16 uid) {
             return RELOADABLE_STRENGTH_ROCKS[i].slot;
         }
         i++;
-    } while (entryZoneId != 0xffff && entryUid != 0xffff);
+    } while (entryZoneId != STRENGTH_ROCK_TABLE_END && entryUid != STRENGTH_ROCK_TABLE_END);
     return STRENGTH_ROCK_SLOT_NONE;
 }
 

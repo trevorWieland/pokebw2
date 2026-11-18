@@ -54,6 +54,13 @@ typedef struct {
     u16 padding;
 } FieldActorConfig;
 
+// A model's footprint type, FieldActorConfig.footprintType: none, prints, or the tracks that turn with the actor
+enum {
+    FOOTPRINT_TYPE_NONE,
+    FOOTPRINT_TYPE_PRINT,
+    FOOTPRINT_TYPE_TRACKS,
+};
+
 // A config's billboardSize: the size of the actor's billboard in pixels, by field_actor_drawdata.c's
 // ACTOR_BILLBOARD_SIZES_INT
 enum {

@@ -311,28 +311,28 @@ void ActorTerrainEffect_Footmark(FieldActor *actor, ActorTerrainEffectParam *par
         if (MapTile_IsPuddle(param->tileClassOrigY)) {
             if (param->season == SEASON_WINTER) {
                 kind = FOOTMARK_KIND_SNOW;
-                if (param->config->footprintType == 2) {
+                if (param->config->footprintType == FOOTPRINT_TYPE_TRACKS) {
                     kind = FOOTMARK_KIND_SNOW_TRACKS;
                 }
             }
         } else if (MapTile_IsMud(param->tileClassOrigY)) {
             if (param->season == SEASON_SPRING || param->season == SEASON_WINTER) {
                 kind = FOOTMARK_KIND_SNOW;
-                if (param->config->footprintType == 2) {
+                if (param->config->footprintType == FOOTPRINT_TYPE_TRACKS) {
                     kind = FOOTMARK_KIND_SNOW_TRACKS;
                 }
             }
         } else if (MapTile_IsSnow(param->tileClassOrigY) == TRUE ||
                    MapTile_IsSnowNoCycling(param->tileClassOrigY) == TRUE) {
             kind = FOOTMARK_KIND_SNOW;
-            if (param->config->footprintType == 2) {
+            if (param->config->footprintType == FOOTPRINT_TYPE_TRACKS) {
                 kind = FOOTMARK_KIND_SNOW_TRACKS;
             }
         } else if (MapTile_IsDeepSand(param->tileClassOrigY) == TRUE) {
             kind = FOOTMARK_KIND_DEEP_SAND_TRACKS;
         } else {
             kind = FOOTMARK_KIND_SAND;
-            if (param->config->footprintType == 2) {
+            if (param->config->footprintType == FOOTPRINT_TYPE_TRACKS) {
                 kind = FOOTMARK_KIND_SAND_TRACKS;
             }
         }

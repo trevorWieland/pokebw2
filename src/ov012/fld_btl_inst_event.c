@@ -21,6 +21,7 @@
 #include "system/game_event.h"
 #include "system/game_system.h"
 #include "system/pms.h"
+#include "system/pms_word.h"
 
 typedef struct {
     GameSystem *gsys;
@@ -46,7 +47,25 @@ typedef struct {
 static GameEventReturnCode EventBtlInstPokeSelect_Callback(GameEvent *event, u32 *state, void *data);
 static GameEventReturnCode EventBtlInstTrainerMsg_Callback(GameEvent *event, u32 *state, void *data);
 
-GameEvent *EventBtlInstPokeSelect_Create(GameSystem *gsys, u32 a1, u32 mode, u32 regulationId, PokeParty *party,
+// EventBtlInstPokeSelect_Callback's steps: the field's fade out and close, the party screen, the field's opening and
+// fade in, which read the picks and result, and the end
+enum {
+    BTL_INST_POKE_SELECT_STEP_FADE_OUT,
+    BTL_INST_POKE_SELECT_STEP_CLOSE_FIELD,
+    BTL_INST_POKE_SELECT_STEP_POKE_LIST,
+    BTL_INST_POKE_SELECT_STEP_OPEN_FIELD,
+    BTL_INST_POKE_SELECT_STEP_FADE_IN,
+    BTL_INST_POKE_SELECT_STEP_END,
+};
+
+// EventBtlInstTrainerMsg_Callback's steps: the message's print, the input that closes it, and its close
+enum {
+    BTL_INST_TRAINER_MSG_STEP_PRINT,
+    BTL_INST_TRAINER_MSG_STEP_WAIT_INPUT,
+    BTL_INST_TRAINER_MSG_STEP_WAIT_CLOSE,
+};
+
+GameEvent *EventBtlInstPokeSelect_Create(GameSystem *gsys, u32 battleType, u32 mode, u32 regulationId, PokeParty *party,
                                          u8 *picked, u32 *choice, u32 *result, PokeParty *entered) {
     Field *field = GSYS_GetField(gsys);
     GameEvent *event = GameEvent_Create(gsys, NULL, EventBtlInstPokeSelect_Callback, sizeof(BtlInstPokeSelectWork));
@@ -67,7 +86,7 @@ GameEvent *EventBtlInstPokeSelect_Create(GameSystem *gsys, u32 a1, u32 mode, u32
     PokeListParam_Setup(partyParam, GSYS_GetGameData(gsys), mode, party);
     PokeRegulation_Load(regulationId, &work->regulation);
     partyParam->regulation = &work->regulation;
-    partyParam->unk48 = a1;
+    partyParam->unk48 = battleType;
     summaryParam = &work->summaryParam;
     gameData = GSYS_GetGameData(gsys);
     pokedex = GameData_GetPokedex(gameData);
@@ -88,30 +107,30 @@ static GameEventReturnCode EventBtlInstPokeSelect_Callback(GameEvent *event, u32
     int i, count;
 
     switch (*state) {
-    case 0:
+    case BTL_INST_POKE_SELECT_STEP_FADE_OUT:
         GameEvent_ChainNext(
             event, CallFieldMapEntranceOutTransitionDefault(gsys, work->field, FIELD_TRANSITION_FADE_BLACK, 0));
         (*state)++;
         break;
-    case 1:
+    case BTL_INST_POKE_SELECT_STEP_CLOSE_FIELD:
         GameEvent_ChainNext(event, CreateFieldCloseEvent(gsys, work->field));
         (*state)++;
         break;
-    case 2:
+    case BTL_INST_POKE_SELECT_STEP_POKE_LIST:
         GameEvent_ChainNext(event, EventPokeList_Create(gsys, work->field, &work->partyParam, &work->summaryParam));
         (*state)++;
         break;
-    case 3:
+    case BTL_INST_POKE_SELECT_STEP_OPEN_FIELD:
         GameEvent_ChainNext(event, EventFieldOpen_CreateHeadless(gsys));
         (*state)++;
         break;
-    case 4:
+    case BTL_INST_POKE_SELECT_STEP_FADE_IN:
         GameEvent_ChainNext(
             event, CallFieldMapEntranceInTransition(gsys, work->field, FIELD_TRANSITION_FADE_BLACK, 0, 1, 0, 0));
         MI_CpuCopy8(work->partyParam.picked, work->picked, sizeof(work->partyParam.picked));
         *work->choice = work->partyParam.index;
         *work->result = work->partyParam.result;
-        if (*work->choice != 7 && *work->choice != 8 && work->entered != NULL) {
+        if (*work->choice != POKELIST_CURSOR_CANCEL && *work->choice != POKELIST_CURSOR_CLOSE && work->entered != NULL) {
             count = PokeParty_GetCapacity(work->entered);
             for (i = 0; i < count; i++) {
                 int slot = work->picked[i] - 1;
@@ -124,7 +143,7 @@ static GameEventReturnCode EventBtlInstPokeSelect_Callback(GameEvent *event, u32
         }
         (*state)++;
         break;
-    case 5:
+    case BTL_INST_POKE_SELECT_STEP_END:
         return GAMEEVENT_DONE;
     }
     return GAMEEVENT_CONTINUE;
@@ -139,7 +158,7 @@ GameEvent *EventBtlInstTrainerMsg_Create(GameSystem *gsys, BSubwayTrainer *train
     event = GameEvent_Create(gsys, NULL, EventBtlInstTrainerMsg_Callback, sizeof(BtlInstTrainerMsgWork));
     work = GameEvent_GetData(event);
     work->gsys = gsys;
-    if (trainers->message.type == 0xffff) {
+    if (trainers->message.type == PMS_WORD_NULL) {
         MsgData *msgData;
 
         work->strbuf = GFL_StrBufCreate(0x5c, HEAPID_GAMEEVENT);
@@ -159,18 +178,18 @@ static GameEventReturnCode EventBtlInstTrainerMsg_Callback(GameEvent *event, u32
     BtlInstTrainerMsgWork *work = data;
 
     switch (*state) {
-    case 0:
+    case BTL_INST_TRAINER_MSG_STEP_PRINT:
         if (MsgBGPrinter_TalkWinMain(work->msgWin) == TRUE) {
             (*state)++;
         }
         break;
-    case 1:
+    case BTL_INST_TRAINER_MSG_STEP_WAIT_INPUT:
         if (GCTX_HIDGetPressedKeys() & (PAD_BUTTON_A | PAD_BUTTON_B)) {
             MsgBGPrinter_DeleteTalkWin(work->msgWin);
             (*state)++;
         }
         break;
-    case 2:
+    case BTL_INST_TRAINER_MSG_STEP_WAIT_CLOSE:
         if (MsgBGPrinter_WaitTalkWinClose(work->msgWin) == TRUE) {
             GFL_StrBufFree(work->strbuf);
             return GAMEEVENT_DONE;

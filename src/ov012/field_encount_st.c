@@ -11,6 +11,7 @@
 #include "nitro/os.h"
 #include "save/encounter.h"
 #include "system/game_data.h"
+#include "system/season.h"
 #include "system/zone_weather.h"
 
 // A group of ROAMING_POKEMON_ZONES's indices. The groups hold indices 0 to 15 once each, but nothing reads them, so
@@ -26,11 +27,11 @@ BOOL EncData_Load(EncData *encData, ArcTool *arc, u16 zoneId, u8 season) {
 
     MI_CpuFill8(encData, 0, sizeof(EncData));
     fileId = GetZoneEncID(zoneId);
-    if (fileId == 0x1fff) {
+    if (fileId == ZONE_ENC_ID_NONE) {
         return FALSE;
     }
     count = GFL_ArcToolGetDataLength(arc, fileId) / sizeof(EncData);
-    if (count != 1 && count != 4) {
+    if (count != 1 && count != SEASON_COUNT) {
         return FALSE;
     }
     if (count == 1) {

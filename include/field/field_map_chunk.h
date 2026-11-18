@@ -33,7 +33,8 @@ typedef struct {
 } FieldChunkLoader;
 
 // How to load and sample a kind of chunk, found by the magic at the start of its file. A table of them ends with
-// magic 0xffffffff
+// FIELD_CHUNK_MAGIC_NONE
+#define FIELD_CHUNK_MAGIC_NONE 0xffffffff
 typedef struct {
     u32 magic;
     // Returns FALSE once the chunk is loaded

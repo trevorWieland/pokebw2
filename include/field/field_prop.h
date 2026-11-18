@@ -9,10 +9,12 @@
 
 // The most resource infos a prop system has, which is also what resIdToIndex holds for a resource it has none of
 #define FIELD_PROP_RES_INFO_MAX 0x80
-// A resource info without a door, an animation slot without an animation, and a resource instance without a resource
+// A resource info without a door, an animation slot without an animation, a resource instance without a resource, and
+// a prop instance without an index
 #define FIELD_PROP_DOOR_NONE 0xffff
 #define FIELD_PROP_ANM_NONE 0xffffffff
 #define FIELD_PROP_RES_INDEX_NONE 0xffffffff
+#define FIELD_PROP_INDEX_NONE 0xffffffff
 
 // What each of a prop's animations is doing, its animationState
 enum {

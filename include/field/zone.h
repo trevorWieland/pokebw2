@@ -10,6 +10,8 @@
 
 // The number of zones, one past the last, which code also uses for no zone
 #define ZONE_MAX 615
+// The encId of a zone without an encounter table, which GetZoneEncID returns
+#define ZONE_ENC_ID_NONE 0x1fff
 
 struct RailPosition {
     u16 componentId;

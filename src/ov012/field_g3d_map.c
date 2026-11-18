@@ -140,8 +140,8 @@ void FieldPropSystem_InstantiateProp(FieldChunk *chunk, FieldPropInstance *insta
 }
 
 void FieldChunk_ReleasePropInstance(FieldChunk *chunk, u32 propIndex) {
-    if (propIndex != 0xffffffff && propIndex < chunk->propCapacity1) {
-        chunk->propInstances[propIndex].resIndex = 0xffffffff;
+    if (propIndex != FIELD_PROP_INDEX_NONE && propIndex < chunk->propCapacity1) {
+        chunk->propInstances[propIndex].resIndex = FIELD_PROP_RES_INDEX_NONE;
         VEC_Set(&chunk->propInstances[propIndex].pos.position, 0, 0, 0);
         chunk->propInstances[propIndex].pos.rotationY = 0;
     }
@@ -154,7 +154,7 @@ FieldPropInstance *FieldChunk_GetPropInstance(FieldChunk *chunk, u32 propIndex) 
         return NULL;
     }
     instance = &chunk->propInstances[propIndex];
-    if (instance->resIndex == 0xffffffff) {
+    if (instance->resIndex == FIELD_PROP_RES_INDEX_NONE) {
         instance = NULL;
     }
     return instance;
@@ -171,7 +171,7 @@ void FieldChunk_ChangeDatID(FieldChunk *chunk, u32 datID) {
     chunk->reqLoadDatID = datID;
     GFL_ArcToolReadRange(chunk->arc, datID, 0, sizeof(magic), &magic);
     i = 0;
-    while (chunk->vtable[i].magic != 0xffffffff) {
+    while (chunk->vtable[i].magic != FIELD_CHUNK_MAGIC_NONE) {
         if (magic == chunk->vtable[i].magic) {
             break;
         }
@@ -329,7 +329,7 @@ void FieldChunk_RenderProps(FieldChunk *chunk, G3DCamera *camera) {
     }
     for (i = 0; i < chunk->propCapacity1; i++) {
         resIndex = chunk->propInstances[i].resIndex;
-        if (resIndex == 0xffffffff || resIndex >= count) {
+        if (resIndex == FIELD_PROP_RES_INDEX_NONE || resIndex >= count) {
             continue;
         }
         obj = GFL_G3DMdlGetEngineModel(GFL_G3DActorGetMdl(handles[resIndex].actor));
@@ -383,12 +383,12 @@ void FieldChunk_ResetProps(FieldChunk *chunk) {
     s32 i;
 
     for (i = 0; i < chunk->propCapacity1; i++) {
-        chunk->propInstances[i].resIndex = 0xffffffff;
+        chunk->propInstances[i].resIndex = FIELD_PROP_RES_INDEX_NONE;
         VEC_Set(&chunk->propInstances[i].pos.position, 0, 0, 0);
         chunk->propInstances[i].pos.rotationY = 0;
     }
     for (i = 0; i < chunk->propCapacity2; i++) {
-        chunk->propInstances2[i].resIndex = 0xffffffff;
+        chunk->propInstances2[i].resIndex = FIELD_PROP_RES_INDEX_NONE;
         VEC_Set(&chunk->propInstances2[i].pos.position, 0, 0, 0);
         chunk->propInstances[i].pos.rotationY = 0;
     }

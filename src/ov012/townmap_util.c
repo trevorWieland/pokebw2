@@ -24,13 +24,13 @@ u16 TownMap_GetMapZone(GameData *gameData, u16 zoneId) {
     if (parent == ZONE_PLASMA_FRIGATE) {
         switch (*EventWork_GetWkPtr(GameData_GetEventWork(gameData), EVENT_WORK_PLASMA_FRIGATE_LOCATION)) {
         default:
-        case 0:
+        case PLASMA_FRIGATE_LOCATION_PWT:
             return ZONE_PWT;
-        case 1:
+        case PLASMA_FRIGATE_LOCATION_ROUTE_21:
             return ZONE_ROUTE_21;
-        case 2:
+        case PLASMA_FRIGATE_LOCATION_GIANT_CHASM:
             return ZONE_GIANT_CHASM;
-        case 3:
+        case PLASMA_FRIGATE_LOCATION_ITSELF:
             return ZONE_PLASMA_FRIGATE;
         }
     }
@@ -71,7 +71,7 @@ BOOL TownMap_CheckFlag(GameData *gameData, u16 flag) {
         }
         return result;
     case TOWNMAP_FLAG_PLASMA_FRIGATE:
-        if (*EventWork_GetWkPtr(eventWork, EVENT_WORK_PLASMA_FRIGATE_LOCATION) == 3) {
+        if (*EventWork_GetWkPtr(eventWork, EVENT_WORK_PLASMA_FRIGATE_LOCATION) == PLASMA_FRIGATE_LOCATION_ITSELF) {
             return TRUE;
         }
         return FALSE;
