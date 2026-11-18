@@ -99,7 +99,7 @@ void OutputMapping(const AddressMapping *mapping) {
 }
 
 static int Think(SOCKET sock, NAT *nat) {
-    static char data[0x200];
+    static char data[NNINBUF_LEN];
     int length;
     gsi_u8 type;
     NatNegPacket packet;
@@ -120,30 +120,30 @@ static int Think(SOCKET sock, NAT *nat) {
             if (memcmp(data, NNMagicData, NATNEG_MAGIC_LEN) != 0) {
                 return gsi_true;
             }
-            type = data[7];
-            if (length < 21) {
+            type = data[BASEPACKET_TYPE_OFFSET];
+            if (length < INITPACKET_SIZE) {
                 return gsi_true;
             }
-            if (type == 2) {
+            if (type == NN_ERTTEST) {
                 // The packet's fields after the port type are not aligned on the wire
-                memcpy(&packet, data, 21);
-                memcpy(&packet.Packet.init.localip, &data[15], 4);
-                memcpy(&packet.Packet.init.localport, &data[19], 2);
+                memcpy(&packet, data, INITPACKET_SIZE);
+                memcpy(&packet.Packet.init.localip, &data[INITPACKET_ADDRESS_OFFSET], 4);
+                memcpy(&packet.Packet.init.localport, &data[INITPACKET_ADDRESS_OFFSET + 4], 2);
                 switch (packet.Packet.init.porttype) {
-                case 1:
+                case NN_PT_NN1:
                     gotERT1 = gsi_true;
                     gsDebugFormat(GSIDebugCat_NatNeg, GSIDebugType_Network, GSIDebugLevel_Comment,
                                   "(1) Got the solicited ERT from: %s\n",
                                   AddressToString(from.addr.addr, NN_SWAP16(from.port), NULL));
                     break;
-                case 2:
+                case NN_PT_NN2:
                     nat->ipRestricted = gsi_false;
                     gotERT2 = gsi_true;
                     gsDebugFormat(GSIDebugCat_NatNeg, GSIDebugType_Network, GSIDebugLevel_Comment,
                                   "(2) Got the unsolicited (address) ERT from: %s\n",
                                   AddressToString(from.addr.addr, NN_SWAP16(from.port), NULL));
                     break;
-                case 3:
+                case NN_PT_NN3:
                     nat->portRestricted = gsi_false;
                     gotERT3 = gsi_true;
                     gsDebugFormat(GSIDebugCat_NatNeg, GSIDebugType_Network, GSIDebugLevel_Comment,
@@ -151,22 +151,22 @@ static int Think(SOCKET sock, NAT *nat) {
                                   AddressToString(from.addr.addr, NN_SWAP16(from.port), NULL));
                     break;
                 }
-            } else if (type == 11) {
-                memcpy(&packet, data, 21);
-                memcpy(&packet.Packet.init.localip, &data[15], 4);
-                memcpy(&packet.Packet.init.localport, &data[19], 2);
+            } else if (type == NN_ADDRESS_REPLY) {
+                memcpy(&packet, data, INITPACKET_SIZE);
+                memcpy(&packet.Packet.init.localip, &data[INITPACKET_ADDRESS_OFFSET], 4);
+                memcpy(&packet.Packet.init.localport, &data[INITPACKET_ADDRESS_OFFSET + 4], 2);
                 packet.cookie = NN_SWAP32(packet.cookie);
                 switch (packet.cookie) {
-                case 0:
+                case packet_map1a:
                     gotADDRESS1a = gsi_true;
                     break;
-                case 3:
+                case packet_map1b:
                     gotADDRESS1b = gsi_true;
                     break;
-                case 1:
+                case packet_map2:
                     gotADDRESS2 = gsi_true;
                     break;
-                case 2:
+                case packet_map3:
                     gotADDRESS3 = gsi_true;
                     break;
                 }
@@ -192,57 +192,60 @@ int NatifyThink(SOCKET sock, NAT *nat) {
 }
 
 gsi_bool DetermineNatType(NAT *nat) {
-    nat->natType = 6;
-    nat->promiscuity = 4;
+    nat->natType = unknown;
+    nat->promiscuity = promiscuity_not_applicable;
     nat->qr2Compatible = gsi_true;
-    if (nat->mappings[0].publicIp == 0 || nat->mappings[1].publicIp == 0 || nat->mappings[2].publicIp == 0) {
+    if (nat->mappings[packet_map1a].publicIp == 0 || nat->mappings[packet_map2].publicIp == 0 ||
+        nat->mappings[packet_map3].publicIp == 0) {
         return gsi_false;
     }
-    if (!nat->portRestricted && !nat->ipRestricted && nat->mappings[0].publicIp == nat->mappings[0].privateIp) {
-        nat->natType = 0;
-    } else if (nat->mappings[0].publicIp == nat->mappings[0].privateIp) {
-        nat->natType = 1;
+    if (!nat->portRestricted && !nat->ipRestricted &&
+        nat->mappings[packet_map1a].publicIp == nat->mappings[packet_map1a].privateIp) {
+        nat->natType = no_nat;
+    } else if (nat->mappings[packet_map1a].publicIp == nat->mappings[packet_map1a].privateIp) {
+        nat->natType = firewall_only;
     } else if (!nat->ipRestricted && !nat->portRestricted &&
-               abs(nat->mappings[2].publicPort - nat->mappings[1].publicPort) >= 1) {
-        nat->natType = 5;
-        nat->promiscuity = 0;
+               abs(nat->mappings[packet_map3].publicPort - nat->mappings[packet_map2].publicPort) >= 1) {
+        nat->natType = symmetric;
+        nat->promiscuity = promiscuous;
     } else if (nat->ipRestricted && !nat->portRestricted &&
-               abs(nat->mappings[2].publicPort - nat->mappings[1].publicPort) >= 1) {
-        nat->natType = 5;
-        nat->promiscuity = 2;
+               abs(nat->mappings[packet_map3].publicPort - nat->mappings[packet_map2].publicPort) >= 1) {
+        nat->natType = symmetric;
+        nat->promiscuity = port_promiscuous;
     } else if (!nat->ipRestricted && nat->portRestricted &&
-               abs(nat->mappings[2].publicPort - nat->mappings[1].publicPort) >= 1) {
-        nat->natType = 5;
-        nat->promiscuity = 3;
+               abs(nat->mappings[packet_map3].publicPort - nat->mappings[packet_map2].publicPort) >= 1) {
+        nat->natType = symmetric;
+        nat->promiscuity = ip_promiscuous;
     } else if (nat->ipRestricted && nat->portRestricted &&
-               abs(nat->mappings[2].publicPort - nat->mappings[1].publicPort) >= 1) {
-        nat->natType = 5;
-        nat->promiscuity = 1;
+               abs(nat->mappings[packet_map3].publicPort - nat->mappings[packet_map2].publicPort) >= 1) {
+        nat->natType = symmetric;
+        nat->promiscuity = not_promiscuous;
     } else if (nat->portRestricted) {
-        nat->natType = 4;
+        nat->natType = port_restricted_cone;
     } else if (nat->ipRestricted && !nat->portRestricted) {
-        nat->natType = 3;
+        nat->natType = restricted_cone;
     } else if (!nat->ipRestricted && !nat->portRestricted) {
-        nat->natType = 2;
+        nat->natType = full_cone;
     } else {
-        nat->natType = 6;
+        nat->natType = unknown;
     }
-    if (nat->mappings[0].publicPort == nat->mappings[0].privatePort &&
-        nat->mappings[1].publicPort == nat->mappings[1].privatePort &&
-        nat->mappings[2].publicPort == nat->mappings[2].privatePort) {
-        nat->mappingScheme = 1;
-    } else if (nat->mappings[0].publicPort == nat->mappings[1].publicPort &&
-               nat->mappings[1].publicPort == nat->mappings[2].publicPort) {
-        nat->mappingScheme = 2;
-    } else if (nat->mappings[0].publicPort == nat->mappings[0].privatePort &&
-               nat->mappings[2].publicPort - nat->mappings[1].publicPort == 1) {
-        nat->mappingScheme = 4;
-    } else if (nat->mappings[2].publicPort - nat->mappings[1].publicPort == 1) {
-        nat->mappingScheme = 3;
+    if (nat->mappings[packet_map1a].publicPort == nat->mappings[packet_map1a].privatePort &&
+        nat->mappings[packet_map2].publicPort == nat->mappings[packet_map2].privatePort &&
+        nat->mappings[packet_map3].publicPort == nat->mappings[packet_map3].privatePort) {
+        nat->mappingScheme = private_as_public;
+    } else if (nat->mappings[packet_map1a].publicPort == nat->mappings[packet_map2].publicPort &&
+               nat->mappings[packet_map2].publicPort == nat->mappings[packet_map3].publicPort) {
+        nat->mappingScheme = consistent_port;
+    } else if (nat->mappings[packet_map1a].publicPort == nat->mappings[packet_map1a].privatePort &&
+               nat->mappings[packet_map3].publicPort - nat->mappings[packet_map2].publicPort == 1) {
+        nat->mappingScheme = mixed;
+    } else if (nat->mappings[packet_map3].publicPort - nat->mappings[packet_map2].publicPort == 1) {
+        nat->mappingScheme = incremental;
     } else {
-        nat->mappingScheme = 0;
+        nat->mappingScheme = unrecognized;
     }
-    if (nat->mappings[3].publicPort != 0 && nat->mappings[0].publicPort != nat->mappings[3].publicPort) {
+    if (nat->mappings[packet_map1b].publicPort != 0 &&
+        nat->mappings[packet_map1a].publicPort != nat->mappings[packet_map1b].publicPort) {
         nat->qr2Compatible = gsi_false;
     }
     return gsi_true;
